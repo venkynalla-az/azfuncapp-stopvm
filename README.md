@@ -1,0 +1,1 @@
+"# azfuncapp-stopvm" 
