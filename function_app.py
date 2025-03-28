@@ -1,4 +1,5 @@
 from azure.identity import DefaultAzureCredential
+from azure.identity import ClientSecretCredential
 from azure.mgmt.compute import ComputeManagementClient
 from azure.core.exceptions import ResourceNotFoundError
 
@@ -7,10 +8,11 @@ import logging
 
 app = func.FunctionApp(http_auth_level=func.AuthLevel.FUNCTION)
 
+
 @app.route(route="http_trigger")
-def stop_vm(req: func.HttpRequest) -> func.HttpResponse:
+def start_vm(req: func.HttpRequest) -> func.HttpResponse:
     logging.info(
-        "Python HTTP trigger function to stop a VM processed a request.")
+        "Python HTTP trigger function to start a VM processed a request.")
 
     # Retrieve query parameters
     subscription_id = req.params.get("subscription_id")
@@ -25,7 +27,8 @@ def stop_vm(req: func.HttpRequest) -> func.HttpResponse:
 
     try:
         # Create a default Azure credential (e.g., from environment or Managed Identity)
-        credential = DefaultAzureCredential()
+        #credential = DefaultAzureCredential()
+        credential = ClientSecretCredential("60943e68-a81c-460d-a797-6cf9d649f2ec", "26df0f3c-dde6-41cd-ac37-f4e3352491d7", "s2z8Q~sBdfIUCy.3tEF-Uy5EzvFXJUs-4XPFAbfk")
 
         # Create the Compute Management client
         compute_client = ComputeManagementClient(credential, subscription_id)
@@ -36,22 +39,22 @@ def stop_vm(req: func.HttpRequest) -> func.HttpResponse:
         for status in instance_state.statuses:
             vm_states.append(status.code)
 
-        if "PowerState/running" in vm_states:
-            # Stop the VM
+        if "PowerState/deallocated" in vm_states:
+            # Start the VM
             logging.info(
-                f"Virtual machine: {vm_name} in resource group: {resource_group} is running. Stopping it now...")            
-            async_vm_stop = compute_client.virtual_machines.begin_deallocate(
+                f"Virtual machine: {vm_name} in resource group: {resource_group} is stopped. Starting it now...")
+            async_vm_start = compute_client.virtual_machines.begin_start(
                 resource_group, vm_name)
-            async_vm_stop.result()  # Wait for the VM to stop
-            return func.HttpResponse(f"Successfully Stopped (deallocated) VM: {vm_name}", status_code=200)
+            async_vm_start.result()  # Wait for the VM to start
+            return func.HttpResponse(f"Successfully started VM: {vm_name}", status_code=200)
         else:
             logging.info(
-                f"Virtual machine: {vm_name} in resource group: {resource_group} is not running.")
-            return func.HttpResponse(f"Virtual machine: {vm_name} is not running.", status_code=200)
+                f"Virtual machine: {vm_name} in resource group: {resource_group} appears to be running.")
+            return func.HttpResponse(f"Virtual machine: {vm_name} appears to be running.", status_code=200)
 
     except ResourceNotFoundError:
         return func.HttpResponse(f"VM: {vm_name} not found in resource group: {resource_group}", status_code=404)
 
     except Exception as e:
-        logging.error(f"Error stopping the VM: {str(e)}")
+        logging.error(f"Error starting the VM: {str(e)}")
         return func.HttpResponse(f"Error: {str(e)}", status_code=500)
